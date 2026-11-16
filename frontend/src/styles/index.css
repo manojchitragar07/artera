@@ -1,0 +1,63 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    background-color: #F5F0E8;
+    color: #252321;
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    overflow-x: hidden;
+  }
+
+  h1, h2, h3, h4, .font-serif {
+    font-family: 'Playfair Display', Cormorant Garamond, Georgia, serif;
+    letter-spacing: -0.01em;
+  }
+}
+
+/* Custom Fine Art Framing & Shadows */
+.frame-natural-oak {
+  box-shadow: 0 0 0 10px #D8C7B5, 0 10px 30px rgba(37, 35, 33, 0.18);
+  border: 1px solid rgba(71, 56, 47, 0.2);
+}
+
+.frame-dark-walnut {
+  box-shadow: 0 0 0 12px #3A2E26, 0 15px 35px rgba(20, 19, 18, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.frame-gold {
+  box-shadow: 0 0 0 8px #B49A65, 0 0 0 12px #8E7745, 0 15px 40px rgba(37, 35, 33, 0.28);
+  border: 1px solid #FAF7F2;
+}
+
+.frame-minimal-linen {
+  box-shadow: 0 0 0 16px #EAE2D5, 0 10px 25px rgba(37, 35, 33, 0.12);
+  border: 1px solid #D8CEBF;
+}
+
+/* Custom Gallery Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #EAE2D5;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #B49A65;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #8E7745;
+}
+
+/* Subtle Museum Lighting Vignette */
+.museum-vignette {
+  background: radial-gradient(circle at 50% 30%, rgba(255, 255, 255, 0.08) 0%, rgba(37, 35, 33, 0.03) 100%);
+}
+

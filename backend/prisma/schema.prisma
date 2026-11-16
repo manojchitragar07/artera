@@ -1,0 +1,491 @@
+// ARTÉRA - Prisma Schema
+// Digital Sanctuary for Traditional Artists & Art Lovers
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// --------------------------------------------------------
+// ENUMS
+// --------------------------------------------------------
+
+enum Role {
+  ARTIST
+  VISITOR
+  ADMIN
+}
+
+enum AccountStatus {
+  PENDING_APPROVAL
+  ACTIVE
+  SUSPENDED
+  REJECTED
+}
+
+enum ArtworkStatus {
+  DRAFT
+  PENDING_APPROVAL
+  PUBLISHED
+  REJECTED
+  ARCHIVED
+}
+
+enum EnquiryStatus {
+  PENDING
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+enum ExhibitionStatus {
+  UPCOMING
+  ONGOING
+  COMPLETED
+  ARCHIVED
+}
+
+enum NotificationType {
+  ENQUIRY_RECEIVED
+  ENQUIRY_REPLIED
+  ARTWORK_APPROVED
+  ARTWORK_REJECTED
+  ARTWORK_FEATURED
+  NEW_FOLLOWER
+  SYSTEM
+}
+
+// --------------------------------------------------------
+// 1. USER
+// --------------------------------------------------------
+
+model User {
+  id           String        @id @default(cuid())
+  email        String        @unique
+  password     String
+  role         Role          @default(VISITOR)
+  status       AccountStatus @default(ACTIVE)
+  refreshToken String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  // Profiles
+  artistProfile  ArtistProfile?
+  visitorProfile VisitorProfile?
+
+  // Notifications
+  notifications Notification[]
+
+  // Admin audit logs (actions performed by this user if admin)
+  auditLogs AdminAuditLog[]
+
+  @@index([email])
+  @@index([role])
+  @@index([status])
+}
+
+// --------------------------------------------------------
+// 2. ARTIST PROFILE
+// --------------------------------------------------------
+
+model ArtistProfile {
+  id                String   @id @default(cuid())
+  userId            String   @unique
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  name              String
+  slug              String   @unique
+  bio               String?
+  statement         String?  // Artist philosophy / statement
+  speciality        String   // e.g. "Oil on Canvas & Renaissance Realism"
+  disciplines       String?  // Comma-separated or descriptor
+  location          String?  // e.g. "Florence, Italy"
+  yearsOfExperience Int?
+  profileImage      String?
+  coverImage        String?
+  website           String?
+  instagram         String?
+  featured          Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Relations
+  artworks  Artwork[]
+  followers ArtistFollow[]
+  enquiries Enquiry[]
+  collections Collection[]
+
+  @@index([slug])
+  @@index([featured])
+}
+
+// --------------------------------------------------------
+// 3. VISITOR PROFILE
+// --------------------------------------------------------
+
+model VisitorProfile {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  name      String
+  avatar    String?
+  bio       String?
+  location  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  favourites      Favourite[]
+  followedArtists ArtistFollow[]
+  collections     Collection[]
+  enquiries       Enquiry[]
+
+  @@index([userId])
+}
+
+// --------------------------------------------------------
+// 4. ARTWORK
+// --------------------------------------------------------
+
+model Artwork {
+  id                  String        @id @default(cuid())
+  artistId            String
+  artist              ArtistProfile @relation(fields: [artistId], references: [id], onDelete: Cascade)
+
+  categoryId          String
+  category            Category      @relation(fields: [categoryId], references: [id])
+
+  mediumId            String?
+  medium              Medium?       @relation(fields: [mediumId], references: [id])
+
+  title               String
+  slug                String        @unique
+  description         String
+  dimensions          String        // e.g. "90 x 120 cm (35 x 47 in)"
+  creationYear        Int
+  
+  price               Float?
+  isForSale           Boolean       @default(true)
+  isEnquiryOnly       Boolean       @default(false)
+
+  status              ArtworkStatus @default(PENDING_APPROVAL)
+  rejectionReason     String?
+
+  isFeatured          Boolean       @default(false)
+  featuredOrder       Int?
+
+  viewsCount          Int           @default(0)
+  favoritesCount      Int           @default(0)
+
+  primaryImageUrl     String
+  primaryImagePublicId String?
+  
+  frameStyle          String?       @default("natural-oak") // e.g. "ornate-gold", "dark-walnut", "minimal-linen", "natural-oak"
+  tags                String?       // comma-separated tags e.g. "figurative,oil,portrait"
+
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+
+  // Relations
+  images              ArtworkImage[]
+  favourites          Favourite[]
+  collectionArtworks  CollectionArtwork[]
+  exhibitionArtworks  ExhibitionArtwork[]
+  views               ArtworkView[]
+  enquiries           Enquiry[]
+
+  @@index([artistId])
+  @@index([categoryId])
+  @@index([mediumId])
+  @@index([status])
+  @@index([isFeatured])
+  @@index([slug])
+}
+
+// --------------------------------------------------------
+// 5. ARTWORK IMAGE
+// --------------------------------------------------------
+
+model ArtworkImage {
+  id        String   @id @default(cuid())
+  artworkId String
+  artwork   Artwork  @relation(fields: [artworkId], references: [id], onDelete: Cascade)
+
+  url       String
+  publicId  String?
+  caption   String?
+  isPrimary Boolean  @default(false)
+  order     Int      @default(0)
+  width     Int?
+  height    Int?
+  createdAt DateTime @default(now())
+
+  @@index([artworkId])
+}
+
+// --------------------------------------------------------
+// 6. CATEGORY
+// --------------------------------------------------------
+
+model Category {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  slug        String    @unique
+  description String?
+  coverImage  String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  artworks    Artwork[]
+
+  @@index([slug])
+}
+
+// --------------------------------------------------------
+// 7. MEDIUM
+// --------------------------------------------------------
+
+model Medium {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  slug        String    @unique
+  description String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  artworks    Artwork[]
+
+  @@index([slug])
+}
+
+// --------------------------------------------------------
+// 8. FAVOURITE
+// --------------------------------------------------------
+
+model Favourite {
+  id        String         @id @default(cuid())
+  visitorId String
+  visitor   VisitorProfile @relation(fields: [visitorId], references: [id], onDelete: Cascade)
+
+  artworkId String
+  artwork   Artwork        @relation(fields: [artworkId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime       @default(now())
+
+  @@unique([visitorId, artworkId])
+  @@index([visitorId])
+  @@index([artworkId])
+}
+
+// --------------------------------------------------------
+// 9. ARTIST FOLLOW
+// --------------------------------------------------------
+
+model ArtistFollow {
+  id        String         @id @default(cuid())
+  visitorId String
+  visitor   VisitorProfile @relation(fields: [visitorId], references: [id], onDelete: Cascade)
+
+  artistId  String
+  artist    ArtistProfile  @relation(fields: [artistId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime       @default(now())
+
+  @@unique([visitorId, artistId])
+  @@index([visitorId])
+  @@index([artistId])
+}
+
+// --------------------------------------------------------
+// 10. COLLECTION
+// --------------------------------------------------------
+
+model Collection {
+  id          String          @id @default(cuid())
+  
+  // Can belong to a visitor (personal saved curation) or artist (portfolio series)
+  visitorId   String?
+  visitor     VisitorProfile? @relation(fields: [visitorId], references: [id], onDelete: Cascade)
+
+  artistId    String?
+  artist      ArtistProfile?  @relation(fields: [artistId], references: [id], onDelete: Cascade)
+
+  title       String
+  slug        String          @unique
+  description String?
+  isPublic    Boolean         @default(true)
+  coverImage  String?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  artworks    CollectionArtwork[]
+
+  @@index([visitorId])
+  @@index([artistId])
+  @@index([slug])
+}
+
+// --------------------------------------------------------
+// 11. COLLECTION ARTWORK
+// --------------------------------------------------------
+
+model CollectionArtwork {
+  id           String     @id @default(cuid())
+  collectionId String
+  collection   Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+
+  artworkId    String
+  artwork      Artwork    @relation(fields: [artworkId], references: [id], onDelete: Cascade)
+
+  order        Int        @default(0)
+  addedAt      DateTime   @default(now())
+
+  @@unique([collectionId, artworkId])
+  @@index([collectionId])
+  @@index([artworkId])
+}
+
+// --------------------------------------------------------
+// 12. ENQUIRY
+// --------------------------------------------------------
+
+model Enquiry {
+  id             String         @id @default(cuid())
+  
+  visitorId      String?
+  visitor        VisitorProfile? @relation(fields: [visitorId], references: [id], onDelete: SetNull)
+
+  artistId       String
+  artist         ArtistProfile  @relation(fields: [artistId], references: [id], onDelete: Cascade)
+
+  artworkId      String?
+  artwork        Artwork?       @relation(fields: [artworkId], references: [id], onDelete: SetNull)
+
+  senderName     String
+  senderEmail    String
+  senderPhone    String?
+  subject        String
+  message        String
+  
+  status         EnquiryStatus  @default(PENDING)
+  artistResponse String?
+  respondedAt    DateTime?
+
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  @@index([visitorId])
+  @@index([artistId])
+  @@index([artworkId])
+  @@index([status])
+}
+
+// --------------------------------------------------------
+// 13. EXHIBITION
+// --------------------------------------------------------
+
+model Exhibition {
+  id               String           @id @default(cuid())
+  title            String
+  slug             String           @unique
+  subtitle         String?
+  curatorStatement String
+  coverImage       String
+  startDate        DateTime
+  endDate          DateTime
+  status           ExhibitionStatus @default(UPCOMING)
+  featured         Boolean          @default(false)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  artworks         ExhibitionArtwork[]
+
+  @@index([slug])
+  @@index([status])
+  @@index([featured])
+}
+
+// --------------------------------------------------------
+// 14. EXHIBITION ARTWORK
+// --------------------------------------------------------
+
+model ExhibitionArtwork {
+  id           String     @id @default(cuid())
+  exhibitionId String
+  exhibition   Exhibition @relation(fields: [exhibitionId], references: [id], onDelete: Cascade)
+
+  artworkId    String
+  artwork      Artwork    @relation(fields: [artworkId], references: [id], onDelete: Cascade)
+
+  order        Int        @default(0)
+  curatorNotes String?
+  addedAt      DateTime   @default(now())
+
+  @@unique([exhibitionId, artworkId])
+  @@index([exhibitionId])
+  @@index([artworkId])
+}
+
+// --------------------------------------------------------
+// 15. ARTWORK VIEW
+// --------------------------------------------------------
+
+model ArtworkView {
+  id        String   @id @default(cuid())
+  artworkId String
+  artwork   Artwork  @relation(fields: [artworkId], references: [id], onDelete: Cascade)
+
+  ipHash    String?
+  visitorId String?
+  viewedAt  DateTime @default(now())
+
+  @@index([artworkId])
+  @@index([viewedAt])
+}
+
+// --------------------------------------------------------
+// 16. NOTIFICATION
+// --------------------------------------------------------
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  title     String
+  message   String
+  type      NotificationType @default(SYSTEM)
+  link      String?
+  isRead    Boolean          @default(false)
+  createdAt DateTime         @default(now())
+
+  @@index([userId])
+  @@index([isRead])
+}
+
+// --------------------------------------------------------
+// 17. ADMIN AUDIT LOG
+// --------------------------------------------------------
+
+model AdminAuditLog {
+  id         String   @id @default(cuid())
+  adminId    String
+  admin      User     @relation(fields: [adminId], references: [id], onDelete: Cascade)
+
+  action     String   // e.g. "APPROVE_ARTIST", "REJECT_ARTWORK", "SUSPEND_USER"
+  targetType String   // e.g. "ArtistProfile", "Artwork", "User", "Exhibition"
+  targetId   String
+  details    String?  // JSON string or notes
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+
+  @@index([adminId])
+  @@index([targetType])
+  @@index([createdAt])
+}
+
